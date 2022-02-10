@@ -1,8 +1,10 @@
 from functools import partial
+
+import torch
 from torch.utils import data
 
 
-def DataFeature():
+class DataFeature():
 
     def __init__(self):
         pass
@@ -12,24 +14,35 @@ def DataFeature():
         return data
 
     def collate(self, data):
+        data = torch.tensor(data)
         return data
 
 
-def Dataset(data.Dataset):
+class Dataset(data.Dataset):
 
-    def __init__(self, dataset, features):
+    def __init__(self, dataset, features, proc_fn=None):
+
+        if proc_fn is not None:
+            dataset = proc_fn(dataset)
         self.dataset = dataset
         self.features = features
 
 
+    def process(dataset):
+        return dataset
+
+
     def __getitem__(self, idx):
-        data = {key: feature.feat(self.dataset[i]) for key, feature in self.features.items()}
+        data = {key: feature.feat(self.dataset[idx]) for key, feature in self.features.items()}
 
         return data
 
+    def __len__(self):
+        return len(self.dataset)
+
 
 def collate_fn(batch, features):
-    data = {key: feature.collate([data['key'] for data in batch])
+    data = {key: feature.collate([data[key] for data in batch])
             for key, feature in features.items()}
 
     return data
@@ -43,7 +56,8 @@ class DataLoader(data.DataLoader):
                 timeout=0, worker_init_fn=None):
 
         _collate_fn = partial(collate_fn, features=dataset.features)
-        super(self.__class__, self).__init__(dataset,
+        super(self.__class__, self).__init__(
+            dataset,
             batch_size=batch_size,
             shuffle=shuffle,
             sampler=sampler,
@@ -53,4 +67,5 @@ class DataLoader(data.DataLoader):
             pin_memory=pin_memory,
             drop_last=drop_last,
             timeout=timeout,
-            worker_init_fn=worker_init_fn)
+            worker_init_fn=worker_init_fn,
+        )

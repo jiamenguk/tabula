@@ -1,59 +1,82 @@
+from typing import List, Optional
+
+import torch
+from tqdm import tqdm
+
+
+def _to_gpu(data):
+    if isinstance(data, list):
+        return [_to_gpu(i) for i in data]
+    elif isinstance(data, dict):
+        return {k: _to_gpu(v) for k, v in data.items()}
+    elif isinstance(data, tuple):
+        return tuple([_to_gpu(i) for i in data])
+    elif torch.is_tensor(data):
+        return data.cuda()
+    else:
+        return data
 
 
 class Slate():
     epoch = None
     iters = None
+    helpers = []
+    train = True
 
-    def __init__(self, dataloader, helpers=None):
-        self.dataloader = dataloader
+    def __init__(self):
 
-        if list is not None:
-            assert type(helpers) == list, "Helpers must be in a list"
-        self.helpers = helpers
-
-        self.epoch = 0
+        self.epoch = 1
         self.iters = 0
         self._stop = False
+        self._data = None
 
-    def step(self, model, data):
+    def step(self, data):
 
         raise NotImplementedError
 
-    def run(self, model, epochs=None, iters=None):
-        self._run(model, epochs, iters)
+    def run(self, dataloader, max_epochs: Optional[int] = None,
+            max_iters: Optional[int] = None):
+        self._run(dataloader, max_epochs, max_iters)
 
-    def _run(self, model, epochs, iters):
+    def _run(self, dataloader, max_epochs, max_iters):
         self._stop = False
 
         while not self._stop:
-
             if self.helpers is not None:
-                for helper in helpers:
-                    helper.epoch_start(self.data, model)
+                for helper in self.helpers:
+                    helper.epoch_start(data=self.data, metadata=self.metadata)
 
-            for batch_data in self.dataloader:
+            data_enum = tqdm(dataloader)
+            for batch_data in data_enum:
                 if self.helpers is not None:
-                    for helper in helpers:
-                        helper.iter_start(self.data, model)
+                    for helper in self.helpers:
+                        helper.iter_start(data=self.data, metadata=self.metadata)
 
-                self._data = self.step(model, batch_data)
+                batch_data = _to_gpu(batch_data)
+
+                loss_dict, self._data = self.step(batch_data)
+
+                message = [f"{k}: {v:.6f}" for k, v in loss_dict.items()]
+                message = ", ".join(message)
+                message = f"Epoch {self.epoch} Iter {self.iters} " + message
+                data_enum.set_description(message)
 
                 if self.helpers is not None:
-                    for helper in helpers:
-                        helper.iter_end(self.data, model)
+                    for helper in self.helpers:
+                        helper.iter_end(data=self.data, metadata=self.metadata)
 
                 self.iters += 1
 
-                if iters is not None and self.iters > iters:
+                if max_iters is not None and self.iters > max_iters:
                     self._stop = True
                     break
 
             if self.helpers is not None:
-                for helper in helpers:
-                    helper.epoch_end(self.data, model)
+                for helper in self.helpers:
+                    helper.epoch_end(data=self.data, metadata=self.metadata)
 
-            epoch += 1
-            if epoch is not None and self.epoch > epochs:
+            self.epoch += 1
+            if max_epochs is not None and self.epoch > max_epochs:
                 self._stop = True
 
         self.shutdown()
@@ -63,10 +86,11 @@ class Slate():
 
     @property
     def data(self):
+        return self._data
+
+    @property
+    def metadata(self):
         return {
-            'info': {
-                'epoch': self.epoch,
-                'iter': self.iters,
-            },
-            'data': self._data,
+            'epoch': self.epoch,
+            'iters': self.iters,
         }
