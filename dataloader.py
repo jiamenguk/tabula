@@ -28,10 +28,6 @@ class Dataset(data.Dataset):
         self.features = features
 
 
-    def process(dataset):
-        return dataset
-
-
     def __getitem__(self, idx):
         data = {key: feature.feat(self.dataset[idx]) for key, feature in self.features.items()}
 
