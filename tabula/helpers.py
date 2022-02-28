@@ -22,7 +22,7 @@ class Helper():
 class CheckpointHelper(Helper):
     save_dir = Path("checkpoints")
 
-    def __init__(self, exp_name, checkpoint_dict, save_epoch=False, save_iters=None):
+    def __init__(self, exp_name, checkpoint_dict, save_epoch=False, save_iters=None, only_save_last=True):
 
         assert save_iters is None or isinstance(save_iters, int), "save_iters must be None or int"
 
@@ -30,10 +30,15 @@ class CheckpointHelper(Helper):
         self.checkpoint_dict = checkpoint_dict
         self.save_epoch = save_epoch
         self.save_iters = save_iters
+        self.only_save_last = only_save_last
 
     def epoch_end(self, data, metadata):
         if self.save_epoch:
-            self._save(data, metadata, 'lastmodel.pt')
+            if self.only_save_last:
+                fname = "lastmodel.pt"
+            else:
+                fname = f"epoch_{metadata['epoch']}.pt"
+            self._save(data, metadata, fname)
 
     def iter_end(self, data, metadata):
         iteration = metadata['iters']
