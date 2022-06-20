@@ -5,7 +5,9 @@ from tqdm import tqdm
 
 
 def _to_gpu(data):
-    if isinstance(data, list):
+    if hasattr(data, 'to_gpu'):
+        return data.to_gpu()
+    elif isinstance(data, list):
         return [_to_gpu(i) for i in data]
     elif isinstance(data, dict):
         return {k: _to_gpu(v) for k, v in data.items()}
@@ -25,7 +27,7 @@ class Slate():
 
     def __init__(self):
 
-        self.epoch = 1
+        self.epoch = 0
         self.iters = 0
         self._stop = False
         self._data = None
@@ -42,12 +44,16 @@ class Slate():
         self._stop = False
 
         while not self._stop:
+            self.epoch += 1
+
             if self.helpers is not None:
                 for helper in self.helpers:
                     helper.epoch_start(data=self.data, metadata=self.metadata)
 
             data_enum = tqdm(dataloader)
             for batch_data in data_enum:
+                self.iters += 1
+
                 if self.helpers is not None:
                     for helper in self.helpers:
                         helper.iter_start(data=self.data, metadata=self.metadata)
@@ -65,8 +71,6 @@ class Slate():
                     for helper in self.helpers:
                         helper.iter_end(data=self.data, metadata=self.metadata)
 
-                self.iters += 1
-
                 if max_iters is not None and self.iters > max_iters:
                     self._stop = True
                     break
@@ -75,7 +79,6 @@ class Slate():
                 for helper in self.helpers:
                     helper.epoch_end(data=self.data, metadata=self.metadata)
 
-            self.epoch += 1
             if max_epochs is not None and self.epoch > max_epochs:
                 self._stop = True
 

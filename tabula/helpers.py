@@ -22,7 +22,7 @@ class Helper():
 class CheckpointHelper(Helper):
     save_dir = Path("checkpoints")
 
-    def __init__(self, exp_name, checkpoint_dict, save_epoch=False, save_iters=None, only_save_last=True):
+    def __init__(self, exp_name, checkpoint_dict, save_epoch=False, save_iters=None, only_save_last=True, strict_loading=True):
 
         assert save_iters is None or isinstance(save_iters, int), "save_iters must be None or int"
 
@@ -31,6 +31,7 @@ class CheckpointHelper(Helper):
         self.save_epoch = save_epoch
         self.save_iters = save_iters
         self.only_save_last = only_save_last
+        self.strict = strict_loading
 
     def epoch_end(self, data, metadata):
         if self.save_epoch:
@@ -63,8 +64,13 @@ class CheckpointHelper(Helper):
 
         for k, v in self.checkpoint_dict.items():
             try:
-                v.load_state_dict(loaded_dict['checkpoint'][k])
+                if isinstance(v, torch.nn.Module):
+                    v.load_state_dict(loaded_dict['checkpoint'][k], strict=self.strict)
+                else:
+                    v.load_state_dict(loaded_dict['checkpoint'][k])
             except KeyError as e:
+                print(e)
+            except ValueError as e:
                 print(e)
 
         return loaded_dict['metadata']
@@ -101,3 +107,13 @@ class SubslateHelper(Helper):
         iteration = metadata['iters']
         if self.run_iters is not None and iteration > 0 and iteration % self.run_iters == 0:
             self._run()
+
+
+class SchedulerHelper(Helper):
+
+    def __init__(self, scheduler):
+
+        self.scheduler = scheduler
+
+    def epoch_end(self, data, metadata):
+        self.scheduler.step()
