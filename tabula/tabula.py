@@ -71,7 +71,7 @@ class Slate():
                     for helper in self.helpers:
                         helper.iter_end(data=self.data, metadata=self.metadata)
 
-                if max_iters is not None and self.iters > max_iters:
+                if max_iters is not None and self.iters >= max_iters:
                     self._stop = True
                     break
 
@@ -79,7 +79,7 @@ class Slate():
                 for helper in self.helpers:
                     helper.epoch_end(data=self.data, metadata=self.metadata)
 
-            if max_epochs is not None and self.epoch > max_epochs:
+            if max_epochs is not None and self.epoch >= max_epochs:
                 self._stop = True
 
         self.shutdown()

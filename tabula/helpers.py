@@ -1,4 +1,6 @@
 import os
+import logging
+
 from pathlib import Path
 
 import torch
@@ -17,6 +19,37 @@ class Helper():
 
     def iter_end(self, data, metadata):
         pass
+
+
+def get_attr(obj, names):
+    if len(names) == 1:
+        return getattr(obj, names[0])
+    else:
+        return get_attr(getattr(obj, names[0]), names[1:])
+
+
+def set_attr(obj, names, val):
+    if len(names) == 1:
+        return setattr(obj, names[0], val)
+    else:
+        return set_attr(getattr(obj, names[0]), names[1:], val)
+
+
+def copy_smallest(model_param, dict_param):
+    assert len(model_param.size()) == len(dict_param.size())
+
+    sizes = []
+    for i, length in enumerate(model_param.size()):
+        if dict_param.size(i) < length:
+            length = dict_param.size(i)
+        sizes.append(length)
+
+    command = "model_param[" + ", ".join([f":{i}" for i in sizes]) + "]"
+    command += ".copy_(dict_param[" + ", ".join([f":{i}" for i in sizes]) + "])"
+    with torch.no_grad():
+        eval(command)
+
+    return model_param
 
 
 class CheckpointHelper(Helper):
@@ -64,8 +97,24 @@ class CheckpointHelper(Helper):
 
         for k, v in self.checkpoint_dict.items():
             try:
-                if isinstance(v, torch.nn.Module):
-                    v.load_state_dict(loaded_dict['checkpoint'][k], strict=self.strict)
+                if isinstance(v, torch.nn.Module) and not self.strict:
+                    state_dict = loaded_dict['checkpoint'][k]
+                    for key, dict_param in state_dict.items():
+                        #if 'mel_encoder' in key or 'prosody_encoder' in key:
+                        #    print("WARNING: NOT LOADING MEL ENCODER OR PROSODY ENCODER")
+                        #    continue
+                        submod_names = key.split(".")
+                        try:
+                            curr_param = get_attr(v, submod_names)
+                        except AttributeError:
+                            logging.warn(f"{submod_names} not in model")
+                            continue
+                        if not (curr_param.size() == dict_param.size()):
+                            new_param = copy_smallest(curr_param, dict_param)
+                        else:
+                            new_param = dict_param
+                        with torch.no_grad():
+                            curr_param.copy_(new_param)
                 else:
                     v.load_state_dict(loaded_dict['checkpoint'][k])
             except KeyError as e:

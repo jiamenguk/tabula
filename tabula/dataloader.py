@@ -37,7 +37,12 @@ class Dataset(data.Dataset):
         return len(self.dataset)
 
 
-def collate_fn(batch, features):
+def collate_fn(batch, features, sort_by=None):
+    if sort_by is not None and sort_by in features:
+        to_sort = [i[sort_by] for i in batch]
+        ind = sorted(range(len(to_sort)), key=lambda x: len(to_sort[x]), reverse=True)
+        batch = [batch[i] for i in ind]
+
     data = {key: feature.collate([data[key] for data in batch])
             for key, feature in features.items()}
 
@@ -46,12 +51,12 @@ def collate_fn(batch, features):
 
 class DataLoader(data.DataLoader):
     def __init__(self, dataset, batch_size=1,
-                shuffle=False, sampler=None,
-                batch_sampler=None, num_workers=0,
-                pin_memory=False, drop_last=False,
-                timeout=0, worker_init_fn=None):
+                 shuffle=False, sampler=None,
+                 batch_sampler=None, num_workers=0,
+                 pin_memory=False, drop_last=False,
+                 timeout=0, worker_init_fn=None, sort_by=None):
 
-        _collate_fn = partial(collate_fn, features=dataset.features)
+        _collate_fn = partial(collate_fn, features=dataset.features, sort_by=sort_by)
         super(self.__class__, self).__init__(
             dataset,
             batch_size=batch_size,
