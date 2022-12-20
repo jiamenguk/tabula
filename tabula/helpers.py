@@ -100,9 +100,6 @@ class CheckpointHelper(Helper):
                 if isinstance(v, torch.nn.Module) and not self.strict:
                     state_dict = loaded_dict['checkpoint'][k]
                     for key, dict_param in state_dict.items():
-                        #if 'mel_encoder' in key or 'prosody_encoder' in key:
-                        #    print("WARNING: NOT LOADING MEL ENCODER OR PROSODY ENCODER")
-                        #    continue
                         submod_names = key.split(".")
                         try:
                             curr_param = get_attr(v, submod_names)
